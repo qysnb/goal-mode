@@ -1,6 +1,7 @@
 ---
 name: goal-mode
 description: Execute a goal end-to-end autonomously — write code, run it, document progress and problems in a timestamped work report (###OpenCode工作报告<时间戳>.md), and resume from checkpoints after interruption. Only interrupts the user for critical matters (irreversible destructive ops, missing credentials, real-money actions, unreachable goals, 3 failed paths). Use when user says "goal mode", "一口气做完", "run until done", "自主完成", "不要打扰我直接做", or provides a goal to execute autonomously.
+argument-hint: "<目标描述> | resume"
 ---
 
 # Goal Mode: 自主目标执行模式
