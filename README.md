@@ -1,53 +1,45 @@
-# goal-mode — 自主目标执行模式(多 Agent)
+# goal-mode — Autonomous Goal Execution (multi-agent)
 
-一个跨 agent 的 skill:设定一个目标后,**agent 一口气自主执行到达成**——拆任务、写代码、运行、验证、写文档/注释,全程记录工作报告。除关键事项外**不打扰用户**,中断后自动续跑。
+A cross-agent skill: set a goal, and the agent executes **autonomously in one go** — break down tasks, write code, run, verify, write docs/comments, and keep a work report throughout. Except for critical matters, it **does not disturb the user**, and it auto-resumes after interruption.
 
-兼容 **opencode / Claude Code / Codex / 其他支持 skill 的 harness**。
+Compatible with **opencode / Claude Code / Codex / any skill-capable harness**.
 
-## 特性
+## Features
 
-- **自主执行**:目标 → 拆任务 → 实现 → 运行验证 → 记录,循环直到成功标准达成
-- **工作报告**:在会话主目录生成 `###OpenCode工作报告<YYYYMMDDHHMM>.md`,进度日志/问题/方案/验证结果全程留档
-- **问题留档**:每个问题记录「现象 / ≥3 条尝试路径 / 解决或待解决 / 备选方案」
-- **不打扰原则**:仅对关键事项(不可逆破坏操作、缺凭据/密钥、真实金钱/账号操作、目标不可达、同一阻塞穷尽 3 条路径仍失败)询问用户;版本迭代批量删旧文件先 git 存档再删,**不打断**
-- **断点自愈**:每个里程碑强制落盘检查点(`GOAL_STATE.json`);因 LLM 输出上限 / 网络中断 / 会话结束中断后,resume 自动复原并先核对磁盘真实状态再续
+- **Autonomous execution**: goal → tasks → implement → run & verify → record, looping until the success criteria are met
+- **Work report**: generates `###OpenCodeWorkReport<YYYYMMDDHHMM>.md` in the session working directory with a full audit trail (progress log / problems / solutions / verification results)
+- **Problem logging**: every problem records "symptom / ≥3 attempted paths / solved-or-pending / alternatives"
+- **No-disturb principle**: only interrupts for critical matters (irreversible destructive ops, missing credentials/keys, real-money/account actions, unreachable goal, same blocker exhausting 3 paths); bulk deletion of old files during version iteration is done after `git` archival — **no interruption**
+- **Self-healing**: every milestone persists a checkpoint (`GOAL_STATE.json`); after interruption (LLM output limit / network / session end), `resume` restores from the checkpoint and first verifies real on-disk state
 
-## 安装
+## Install
 
-### 方式一:按 agent 选择变体
+### Option 1: pick the variant for your agent
 
 ```bash
 git clone https://github.com/qysnb/goal-mode.git
 ```
 
-| Agent | 复制源 | 目标目录 |
+| Agent | Source | Target directory |
 |---|---|---|
 | opencode | `agents/opencode/` | `~/.config/opencode/skills/goal-mode/` |
 | Claude Code | `agents/claude-code/` | `~/.claude/skills/goal-mode/` |
-| Codex / 通用 | 根 `SKILL.md` | `~/.codex/skills/goal-mode/` 或任意 `**/SKILL.md` 技能目录 |
+| Codex / generic | root `SKILL.md` | `~/.codex/skills/goal-mode/` or any `**/SKILL.md` skills dir |
 
-示例(opencode,全局):
+Example (opencode, global):
 
 ```bash
 mkdir -p ~/.config/opencode/skills/goal-mode
 cp goal-mode/agents/opencode/SKILL.md ~/.config/opencode/skills/goal-mode/SKILL.md
 ```
 
-Windows (PowerShell):
-
-```powershell
-git clone https://github.com/qysnb/goal-mode.git
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\opencode\skills\goal-mode"
-Copy-Item goal-mode\agents\opencode\SKILL.md "$env:USERPROFILE\.config\opencode\skills\goal-mode\SKILL.md"
-```
-
-### 方式二:`npx skills`(若使用 vercel-labs/skills CLI)
+### Option 2: `npx skills` (vercel-labs/skills CLI)
 
 ```bash
 npx skills add qysnb/goal-mode -a claude-code -a codex -y
 ```
 
-### 方式三:opencode `skills.paths`(不复制)
+### Option 3: opencode `skills.paths` (no copy)
 
 ```json
 {
@@ -55,57 +47,49 @@ npx skills add qysnb/goal-mode -a claude-code -a codex -y
 }
 ```
 
-> 安装后**重启对应 agent** 才会加载生效(配置仅在启动时读取)。
+> Restart the target agent after installing — config is loaded at startup.
 
-## 使用
+## Usage
 
 ```
-/goal-mode <目标描述>     # opencode:开始自主执行
-/goal-mode resume         # opencode:中断后从检查点续跑
+/goal-mode <goal>     # opencode: start autonomous execution
+/goal-mode resume     # opencode: resume from checkpoint after interruption
 ```
 
-其他 agent 直接用自然语言:`goal mode: <目标>`、`一口气做完`、`run until done`、`自主完成`、`不要打扰我直接做`;续跑用「继续上次的目标」。详见 `docs/COMPATIBILITY.md`。
+For other agents use natural language: `goal mode: <goal>` / `run until done` / `do it in one go` / `autonomous`; to resume, say "continue the last goal".
 
-## 产物
+## Artifacts
 
-| 文件 | 说明 |
+| File | Description |
 |---|---|
-| `###OpenCode工作报告<YYYYMMDDHHMM>.md` | 工作报告(主交付物),含 目标/约束与成功标准/执行计划/进度日志/问题与解决方案/验证结果/最终总结 |
-| `GOAL_STATE.json` | 检查点,断点续跑依据,每个里程碑覆盖写 |
+| `###OpenCodeWorkReport<YYYYMMDDHHMM>.md` | Work report (main deliverable): goal / constraints & success criteria / execution plan / progress log / problems & solutions / verification results / final summary |
+| `GOAL_STATE.json` | Checkpoint for resume; overwritten at every milestone |
 
-## 打断(升级)白名单
+## Interrupt / escalation whitelist
 
-仅在以下情况 agent 会暂停并提问,其余全程静默执行:
+The agent pauses and asks **only** in these cases; otherwise it runs silently:
 
-1. 不可逆破坏性操作(如 `rm -rf` 未版本化数据、`git reset --hard` 丢弃未提交工作、强推)
-2. 需要 API key / 密码 / 密钥但环境中没有
-3. 真实金钱 / 账号操作(付款、购买、注册、开通服务)
-4. 目标根本不可达 / 方向冲突
-5. 同一阻塞已穷尽 ≥3 条不同路径仍失败(附已尝试方案 + 建议)
+1. Irreversible destructive ops (e.g., `rm -rf` of unversioned data, `git reset --hard` discarding uncommitted work, force push)
+2. API key / password / token needed but not available in the environment
+3. Real money / account actions (payments, purchases, registrations, enabling services)
+4. Goal fundamentally unreachable / conflicting direction
+5. Same blocker exhausted ≥3 different paths (report once with tried approaches + suggestion)
 
-完成时发送一条完成摘要(目标 / 主要成果 / 报告路径 / 遗留问题)。
+On completion it sends a single summary (goal / key results / report path / open issues).
 
-## 仓库结构
+## Repository layout
 
 ```
 goal-mode/
-├── SKILL.md                  # canonical(agent 中立,任意 harness 可加载)
+├── SKILL.md                  # canonical (agent-neutral; loadable by any harness)
 ├── agents/
-│   ├── opencode/SKILL.md     # opencode 变体(argument-hint/allowed-tools)
-│   └── claude-code/SKILL.md  # Claude Code 变体
-├── docs/
-│   ├── COMPATIBILITY.md      # 各 agent 安装/使用/校验说明
-│   └── RESEARCH.md           # 同类方案调研报告
+│   ├── opencode/SKILL.md     # opencode variant (argument-hint / allowed-tools)
+│   └── claude-code/SKILL.md  # Claude Code variant
 └── scripts/
-    └── verify-skill.ps1      # 生成变体 + 全量校验
+    └── verify-skill.ps1      # regenerate variants + full validation
 ```
 
-变体由根 `SKILL.md` 自动生成(`pwsh scripts/verify-skill.ps1`),正文保持一致。
-
-## 相关
-
-- [调研报告](docs/RESEARCH.md):同类 goal-mode 方案对比(goalbuddy / opencode-goal-plugin / loop-goal 等)
-- 受 OpenAI Codex 原生 `/goal` 启发,独立实现,不依赖官方 gated 能力
+Variants are auto-generated from the root `SKILL.md` (`pwsh scripts/verify-skill.ps1`) so bodies stay byte-identical. To customize the work-report name, change `REPORT_PREFIX` in the skill's Constants.
 
 ## License
 

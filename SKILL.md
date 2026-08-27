@@ -1,162 +1,162 @@
 ---
 name: goal-mode
-description: Execute a goal end-to-end autonomously — write code, run it, document progress and problems in a timestamped work report (###OpenCode工作报告<时间戳>.md), and resume from checkpoints after interruption. Only interrupts the user for critical matters (irreversible destructive ops, missing credentials, real-money actions, unreachable goals, 3 failed paths). Use when user says "goal mode", "一口气做完", "run until done", "自主完成", "不要打扰我直接做", or provides a goal to execute autonomously.
+description: Execute a goal end-to-end autonomously — write code, run it, verify, document progress and problems in a timestamped work report (###OpenCodeWorkReport<timestamp>.md), and resume from checkpoints after interruption. Only interrupts the user for critical matters (irreversible destructive ops, missing credentials, real-money actions, unreachable goals, 3 failed paths). Use when user says "goal mode", "run until done", "do it in one go", "autonomous", or provides a goal to execute autonomously.
 ---
 
-# Goal Mode: 自主目标执行模式
+# Goal Mode: Autonomous Goal Execution
 
-把一个目标(goal)交给你,由你**一口气自主执行到达成**:拆任务 → 写代码 → 运行 → 验证 → 写文档/注释 → 全程记录工作报告。除白名单内的关键事项外,**不打扰用户**。
+Give the agent a goal and let it execute **autonomously in one go**: break down tasks → write code → run → verify → document → keep a work report throughout. Except for whitelisted critical matters, **do not disturb the user**.
 
-> ⚠️ 本 skill **显式覆盖**默认的"先批准再实现"行为(brainstorming 的 HARD-GATE 不适用于本模式)。除「打断/升级策略」白名单外,你**不得**询问"是否可以开始/要不要我继续/我这样做可以吗"。直接执行。
+> ⚠️ This skill **explicitly overrides** the default "get approval before implementing" behavior (the brainstorming HARD-GATE does not apply here). Except for the interrupt/escalation whitelist, you **must not** ask "may I start / shall I continue / is this OK". Just execute.
 
-> 🔧 **跨 Agent**:本文件为 agent 中立版本,frontmatter 仅保留 `name` + `description`,工具名用通用表述,可直接被任何支持 skill 的 agent/harness 加载。各 agent 专属变体(带 `argument-hint`、`allowed-tools` 等)见仓库 `agents/` 目录,由本文件生成,正文完全一致。
+> 🔧 **Cross-agent**: this file is the agent-neutral version. Frontmatter has only `name` + `description`, tool names are generic, and it can be loaded by any skill-capable agent/harness. Agent-specific variants (with `argument-hint`, `allowed-tools`) live in `agents/` and are generated from this file with byte-identical bodies.
 
-## 常量
+## Constants
 
-- **REPORT_PREFIX** = `###OpenCode工作报告`
-- **TIMESTAMP** = `YYYYMMDDHHMM`(例如 `202608271902`)
-- **REPORT_FILE** = `<REPORT_PREFIX><TIMESTAMP>.md`(写入**会话主目录**,即当前工作目录)
-- **STATE_FILE** = `GOAL_STATE.json`(同一目录,固定名,用于断点续跑)
-- **RESUME_WINDOW** = 24 小时(超出则视为过期状态,全新开始)
-- **BLOCK_PATHS** = 3(同一阻塞需穷尽 **≥3 条不同路径**方可升级打断)
-- **报告语言** = 中文(与用户一致);文件名与内容均用中文
+- **REPORT_PREFIX** = `###OpenCodeWorkReport`
+- **TIMESTAMP** = `YYYYMMDDHHMM` (e.g., `202608271902`)
+- **REPORT_FILE** = `<REPORT_PREFIX><TIMESTAMP>.md` (written to the **session working directory**)
+- **STATE_FILE** = `GOAL_STATE.json` (same directory, fixed name, used for resume)
+- **RESUME_WINDOW** = 24 hours (state older than this is treated as stale → fresh start)
+- **BLOCK_PATHS** = 3 (a blocker must exhaust **≥3 different paths** before escalation)
+- **Report language** = match the user's language (default English); file name and content use the same language
 
-## 文件契约
+## File Contract
 
-**工作报告 `###OpenCode工作报告<时间戳>.md`** — 主交付物,模板见下,随进度持续追加。
+**Work report `###OpenCodeWorkReport<timestamp>.md`** — the main deliverable; template below; appended as work progresses.
 
-**检查点 `GOAL_STATE.json`** — 断点恢复依据,每个里程碑覆盖写:
+**Checkpoint `GOAL_STATE.json`** — basis for resume; overwritten at every milestone:
 
 ```json
 {
-  "goal": "<目标描述>",
+  "goal": "<goal description>",
   "status": "in_progress",
-  "report_file": "###OpenCode工作报告202608271902.md",
+  "report_file": "###OpenCodeWorkReport202608271902.md",
   "created_at": "2026-08-27T19:02:00",
   "last_updated": "2026-08-27T19:30:00",
   "success_criteria": ["..."],
-  "todo": ["任务A", "任务B"],
-  "done": ["任务A"],
-  "current_task": "任务B",
-  "next_action": "实现模块 X 并运行验证",
-  "problems": [{"desc": "...", "attempts": ["路径1", "路径2", "路径3"], "status": "solved|pending"}]
+  "todo": ["task A", "task B"],
+  "done": ["task A"],
+  "current_task": "task B",
+  "next_action": "implement module X and verify",
+  "problems": [{"desc": "...", "attempts": ["path 1", "path 2", "path 3"], "status": "solved|pending"}]
 }
 ```
 
-## 调用方式(按 agent)
+## Invocation (per agent)
 
-- **opencode**:`/goal-mode <目标>` 开始;`/goal-mode resume` 断点续跑(变体见 `agents/opencode/`)
-- **Claude Code**:直接以自然语言给出目标(如"goal mode: 完成X"),或按已安装命令触发;续跑用"继续上次的目标"(变体见 `agents/claude-code/`)
-- **Codex**:`/goal <目标>` 或自然语言触发;Codex 原生 `/goal` 为 OpenAI 侧能力,本 skill 是其独立的通用实现(变体见 `agents/codex/`)
-- **其他 harness**:把目标作为 prompt 交给 agent,语言如"goal mode: <目标>";中断后再次给出同一目标并说明"resume"
+- **opencode**: `/goal-mode <goal>` to start; `/goal-mode resume` to resume (variant in `agents/opencode/`)
+- **Claude Code**: give the goal in natural language (e.g., "goal mode: do X") or use an installed command; resume with "continue the last goal" (variant in `agents/claude-code/`)
+- **Codex**: `/goal <goal>` or natural language; Codex's native `/goal` is an OpenAI-gated capability — this skill is an independent generic implementation (use the root SKILL.md)
+- **Other harnesses**: hand the goal to the agent as a prompt, e.g., "goal mode: <goal>"; to resume, give the same goal again and say "resume"
 
-## 工作流
+## Workflow
 
-### Phase 0: 目标摄入
+### Phase 0: Goal intake
 
-- 若参数/意图为 `resume` / `继续` / `恢复`:
-  - `STATE_FILE` 存在 且 `status=in_progress` 且 `last_updated` 在 24h 内 → **走 Phase 5 断点续跑**
-  - 否则 → 说明"无有效断点,全新开始",走 Phase 1
-- 若为新目标:
-  - 若 `STATE_FILE` 存在 且 `status=in_progress` 且 24h 内 → **询问一次**:恢复旧目标 / 放弃旧目标开新 / 合并(涉及未完成工作的取舍,属方向级事项)
-  - 否则 → 全新开始,走 Phase 1
+- If the argument/intent is `resume` / `continue`:
+  - `STATE_FILE` exists AND `status=in_progress` AND `last_updated` within 24h → **go to Phase 5 (resume)**
+  - otherwise → state "no valid checkpoint, fresh start", go to Phase 1
+- If it is a new goal:
+  - If `STATE_FILE` exists AND `status=in_progress` AND within 24h → **ask once**: resume old goal / discard old goal and start new / merge (involves discarding in-progress work — a direction-level matter)
+  - otherwise → fresh start, go to Phase 1
 
-### Phase 1: 初始化
+### Phase 1: Initialize
 
-1. 读取项目上下文:**先读项目约定文件**(如 `AGENTS.md`、`CLAUDE.md`)、目录结构、最近 commit,识别语言/脚本/约定/验证方式(有无测试套件、示例脚本等)
-2. 创建 `REPORT_FILE`,写入骨架(见模板)
-3. 创建 `STATE_FILE`(goal、success_criteria、todo 初版、status=in_progress)
-4. 在报告中记录:目标、约束、成功标准、执行计划初稿
+1. Read project context: **first read project convention files** (e.g., `AGENTS.md`, `CLAUDE.md`), directory structure, recent commits; identify language/scripts/conventions and the verification approach (test suite? sample scripts?)
+2. Create `REPORT_FILE` with the skeleton (template below)
+3. Create `STATE_FILE` (goal, success_criteria, initial todo, status=in_progress)
+4. Record in the report: goal, constraints, success criteria, initial execution plan
 
-### Phase 2: 执行循环(直到成功标准达成或触发升级)
+### Phase 2: Execution loop (until success criteria met or escalation triggered)
 
-每轮:
+Each round:
 
-1. **选任务**:从 `todo` 取最高价值/最前置的下一项
-2. **实现**:写代码并附带必要注释/文档字符串;按需更新项目文档
-3. **运行验证**:用项目约定方式验证(有测试就跑测试;无测试用示例脚本/运行命令;Web 项目可构建/预览)。验证要**真跑**,不得假设
-4. **记录**:把结果写入报告「进度日志」;成功/失败/部分完成都如实写
-5. **落盘**:刷新 `STATE_FILE`(`todo`/`done`/`current_task`/`next_action`/`problems`/`last_updated`)——**每次里程碑必须落盘**
-6. **判定**:对照 `success_criteria`,全部满足 → 走 Phase 4;未满足 → 进入下一轮
+1. **Pick a task**: from `todo`, take the highest-value / most upstream next item
+2. **Implement**: write code with necessary comments/docstrings; update project docs as needed
+3. **Run and verify**: verify using the project's conventions (run tests if any; otherwise sample scripts / run commands; web projects can build/preview). Verification must be **actually executed**, never assumed
+4. **Record**: write the outcome to the report's Progress Log; record success/failure/partial honestly
+5. **Persist**: refresh `STATE_FILE` (`todo`/`done`/`current_task`/`next_action`/`problems`/`last_updated`) — **every milestone must be persisted**
+6. **Judge**: check `success_criteria`; all satisfied → go to Phase 4; otherwise → next round
 
-阻塞处理(任一任务遇阻时):
-- 先穷尽 **≥3 条不同路径**解决(改实现、换工具、查资料、换思路),每次失败记录:尝试了什么 / 为何不行 / 下一步备选
-- 3 条路径都失败 → 走 Phase 3 白名单第 5 条升级
+Blocker handling (when a task is blocked):
+- First exhaust **≥3 different paths** (change implementation, switch tools, research, rethink), logging for each failure: what was tried / why it failed / next alternative
+- If all 3 paths fail → escalate via whitelist item 5
 
-### Phase 3: 打断/升级策略
+### Phase 3: Interrupt / Escalation policy
 
-**仅以下情形**暂停并提问(一条消息,说明阻塞 + 给出选项;用户答复后静默继续):
+**Only** pause and ask (one message: state the blocker + options; after the user replies, continue silently) in these cases:
 
-1. **不可逆破坏性操作**:如 `rm -rf` 未版本化数据、删除用户数据文件、`git reset --hard` 丢弃未提交工作、强推覆盖远程等。
-   - **例外**:版本迭代中批量删除旧文件 → 先 `git add` + `git commit`(或归档)存档,再删除,**不打断**。
-2. **缺凭据/密钥**:需要 API key/密码/令牌但环境中没有 → 询问,禁止猜测、硬编码进代码/仓库。
-3. **真实金钱/账号操作**:付款、购买、注册、开通外部服务等。
-4. **目标根本不可达/方向冲突**:成功标准自相矛盾,或目标在现实约束下完全无法推进 → 询问是否调整方向/范围。
-5. **反复碰壁**:同一阻塞已穷尽 ≥3 条不同路径仍失败 → 报告一次(附已尝试方案 + 建议下一步 + 待决问题),等指示。
+1. **Irreversible destructive ops**: e.g., `rm -rf` of unversioned data, deleting user data files, `git reset --hard` discarding uncommitted work, force-pushing over remote, etc.
+   - **Exception**: bulk deletion of old files in normal version iteration → first `git add` + `git commit` (or archive) to preserve, then delete — **no interruption**.
+2. **Missing credentials/keys**: need an API key/password/token not present in the environment → ask; never guess or hardcode into code/repo.
+3. **Real money/account actions**: payments, purchases, registrations, enabling external services, etc.
+4. **Goal fundamentally unreachable / conflicting direction**: success criteria contradict each other, or the goal cannot proceed under real constraints → ask whether to adjust direction/scope.
+5. **Repeated failure**: same blocker exhausted ≥3 different paths and still failing → report once (with tried approaches + suggested next step + open questions), wait for instructions.
 
-除此之外**绝不打扰**:不中途汇报进度、不问"要不要继续"、不请求批准。
+Otherwise **never disturb**: no mid-progress reports, no "shall I continue?", no approval requests.
 
-### Phase 4: 完成判定
+### Phase 4: Completion check
 
-1. **最终验证**:重跑验证命令,确认产出物存在且非空;逐条对照 `success_criteria`
-2. 补全报告「验证与测试结果」和「最终总结」(目标 / 关键结果 / 遗留问题 / 报告路径)
-3. `STATE_FILE` 置 `status=completed`
-4. 向用户发送**一条**完成摘要(目标 / 主要成果 / 报告文件路径 / 遗留问题)
+1. **Final verification**: re-run verification commands, confirm deliverables exist and are non-empty; check every `success_criteria` item
+2. Complete the report's "Verification & Test Results" and "Final Summary" (goal / key results / open issues / report path)
+3. Set `STATE_FILE` `status=completed`
+4. Send the user **one** completion summary (goal / key results / report file path / open issues)
 
-### Phase 5: 断点续跑(resume)
+### Phase 5: Resume
 
-1. 读 `STATE_FILE` 与 `REPORT_FILE`,恢复上下文
-2. **先核对磁盘真实状态**(`git status`、文件是否存在、输出/产物是否已生成、进程是否在跑),**再**决定从哪继续——绝不基于过期假设
-3. 从 `next_action` 续;若中断发生在"写一半/跑到一半"的步骤,先重做该步骤
-4. 在报告追加一行:`已从断点恢复(<时间>),下一步: <next_action>`
-5. 回到 Phase 2 循环
+1. Read `STATE_FILE` and `REPORT_FILE` to restore context
+2. **First verify the real on-disk state** (`git status`, files exist, outputs/artifacts generated, processes running), **then** decide where to continue — never based on stale assumptions
+3. Continue from `next_action`; if interrupted mid-write/mid-run, redo that step first
+4. Append to the report: `Resumed from checkpoint (<time>), next: <next_action>`
+5. Return to the Phase 2 loop
 
-## 工作报告模板
+## Work report template
 
 ```markdown
-### OpenCode工作报告 202608271902
+### OpenCodeWorkReport 202608271902
 
-## 目标
-<目标描述>
+## Goal
+<goal description>
 
-## 约束与成功标准
-- 约束: <环境/资源/时间等限制>
-- 成功标准:
-  - [ ] <可验证的标准 1>
-  - [ ] <可验证的标准 2>
+## Constraints & Success Criteria
+- Constraints: <environment/resource/time limits>
+- Success criteria:
+  - [ ] <verifiable criterion 1>
+  - [ ] <verifiable criterion 2>
 
-## 执行计划
-- [ ] 任务 1 …
-- [ ] 任务 2 …
+## Execution Plan
+- [ ] task 1 …
+- [ ] task 2 …
 
-## 进度日志
-| 时间 | 任务 | 结果 |
+## Progress Log
+| Time | Task | Result |
 |---|---|---|
 
-## 遇到的问题与解决方案
-### <问题标题>
-- 现象:
-- 已尝试路径:
+## Problems & Solutions
+### <problem title>
+- Symptom:
+- Attempted paths:
   1. …
   2. …
   3. …
-- 解决 / 待解决:
-- 备选方案:
+- Solved / Pending:
+- Alternatives:
 
-## 验证与测试结果
+## Verification & Test Results
 
-## 最终总结
+## Final Summary
 ```
 
-## 关键规则
+## Key Rules
 
-- **不打扰原则**:除 Phase 3 白名单外,全程自主,不问任何"要不要/是否可以/继续吗"
-- **诚实记录**:失败、负结果、卡点必须如实写入报告;禁止编造测试结果、运行输出或"看起来成功"的假象
-- **穷尽再升级**:阻塞先走 ≥3 条不同路径,不轻易放弃;每条失败都留档备选
-- **强制落盘**:每个任务完成、每条重要日志写入后,立即刷新 `STATE_FILE` 与报告——断电/断网/输出上限最多丢失当前一步
-- **断点自愈**:若因 LLM 输出上限、网络中断、会话结束等中断,用户再次以 resume 意图触发即可从检查点复原
-- **大文件写入**:文件写入工具失败时,改用 shell heredoc(`cat << 'EOF' > file`)分块写入,不询问
-- **文档与注释**:产出代码附必要注释/文档字符串;文档按需更新并记入报告
-- **凭据安全**:密钥只经环境变量或询问获得,绝不写入代码或提交仓库
-- **环境优先**:动手前先读项目约定文件(如 `AGENTS.md`);无测试套件时用示例脚本/运行命令做验证
-- **诚实停止**:所有路径穷尽必须等待用户时,把"待办 / 已尝试 / 建议"写清再打断,不让工作假死
+- **No-disturb principle**: except the Phase 3 whitelist, stay fully autonomous; never ask "shall I / may I / continue?"
+- **Honest recording**: failures, negative results, and blockers must be recorded truthfully in the report; never fabricate test results, run output, or a "looks successful" illusion
+- **Exhaust before escalating**: blockers first go through ≥3 different paths; don't give up easily; log alternatives for each failure
+- **Forced persistence**: after every completed task and important log entry, immediately refresh `STATE_FILE` and the report — a power/network/output-limit cut loses at most the current step
+- **Self-healing**: if interrupted by LLM output limits, network issues, or session end, triggering resume intent again restores from the checkpoint
+- **Large file writes**: if the file-write tool fails, fall back to a shell heredoc (`cat << 'EOF' > file`) chunked write, without asking
+- **Docs & comments**: produced code gets necessary comments/docstrings; docs updated as needed and logged in the report
+- **Credential safety**: secrets come only from environment variables or by asking; never written into code or committed to a repo
+- **Environment first**: read project convention files (e.g., `AGENTS.md`) before acting; use sample scripts/run commands when no test suite exists
+- **Honest stop**: when all paths are exhausted and the user must be waited on, write down "todo / tried / suggested" clearly before interrupting — don't let the work hang

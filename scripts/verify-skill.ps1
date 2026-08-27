@@ -34,12 +34,12 @@ $extraKeys = $keys | Where-Object { $_ -notin @('name', 'description') }
 Check ($extraKeys.Count -eq 0) "frontmatter has ONLY name+description (extra: $($extraKeys -join ','))"
 Check ($body -match 'Phase 0') "body contains Phase 0"
 Check ($body -match 'Phase 5') "body contains Phase 5"
-Check ($body -match '关键规则') "body contains 关键规则"
+Check ($body -match 'Key Rules') "body contains Key Rules"
 Check ($body -match 'GOAL_STATE\.json') "state file is neutral GOAL_STATE.json"
 
 $variants = @(
-    @{ dir = 'agents\opencode';       extra = @('argument-hint: "<目标描述> | resume"', 'allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, Skill, WebFetch, WebSearch') },
-    @{ dir = 'agents\claude-code';    extra = @('argument-hint: "<目标描述> | resume"') }
+    @{ dir = 'agents\opencode';       extra = @('argument-hint: "<goal description> | resume"', 'allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, Skill, WebFetch, WebSearch') },
+    @{ dir = 'agents\claude-code';    extra = @('argument-hint: "<goal description> | resume"') }
 )
 
 if (-not $SkipGenerate) {
