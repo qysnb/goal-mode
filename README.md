@@ -85,11 +85,10 @@ goal-mode/
 ├── agents/
 │   ├── opencode/SKILL.md     # opencode variant (argument-hint / allowed-tools)
 │   └── claude-code/SKILL.md  # Claude Code variant
-└── scripts/
-    └── verify-skill.ps1      # regenerate variants + full validation
+└── README.zh-CN.md           # 中文说明
 ```
 
-Variants are auto-generated from the root `SKILL.md` (`pwsh scripts/verify-skill.ps1`) so bodies stay byte-identical. To customize the work-report name, change `REPORT_PREFIX` in the skill's Constants.
+Variants mirror the root `SKILL.md` body (only frontmatter differs). To customize the work-report name, change `REPORT_PREFIX` in the skill's Constants.
 
 ## License
 

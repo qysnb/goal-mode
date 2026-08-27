@@ -95,11 +95,10 @@ goal-mode/
 ├── agents/
 │   ├── opencode/SKILL.md     # opencode 变体(argument-hint / allowed-tools)
 │   └── claude-code/SKILL.md  # Claude Code 变体
-└── scripts/
-    └── verify-skill.ps1      # 生成变体 + 全量校验
+└── README.zh-CN.md           # 中文说明
 ```
 
-变体由根 `SKILL.md` 自动生成(`pwsh scripts/verify-skill.ps1`),正文保持一致。
+变体与根 `SKILL.md` 正文保持一致(仅 frontmatter 不同)。
 
 ## License
 
